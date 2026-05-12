@@ -5,32 +5,18 @@ import { useRouter } from 'next/navigation'
 
 export default function Dashboard() {
   const [user, setUser] = useState(null)
-  const [plans, setPlans] = useState([])
-  const [selectedPlan, setSelectedPlan] = useState(null)
-  const [utr, setUtr] = useState('')
-  const [youtubeLink, setYoutubeLink] = useState('')
-  const [streamKey, setStreamKey] = useState('')
-  const [chatMsg, setChatMsg] = useState('')
-  const [messages, setMessages] = useState([])
-  const [payments, setPayments] = useState([])
+  const [streams, setStreams] = useState([
+    { id: 1, youtubeLink: '', streamKey: '' }
+  ])
   const [loading, setLoading] = useState(false)
-
   const router = useRouter()
-
-  //const QR_IMAGE = 'https://via.placeholder.com/200x200.png?text=Scan+To+Pay'
-  const QR_IMAGE = 'https://via.placeholder.com/200x200.png?text=Scan+To+Pay'
 
   useEffect(() => {
     getUser()
-    getPlans()
   }, [])
 
   useEffect(() => {
-    if (user) {
-      getStreamData()
-      getMessages()
-      getPayments()
-    }
+    if (user) getStreams()
   }, [user])
 
   const getUser = async () => {
@@ -39,99 +25,59 @@ export default function Dashboard() {
     else setUser(user)
   }
 
-  const getPlans = async () => {
-    const { data, error } = await supabase.from('plans').select('*').order('price')
-    if (error) console.log(error)
-    else setPlans(data || [])
-  }
-
-  const getStreamData = async () => {
+  const getStreams = async () => {
     const { data } = await supabase
      .from('user_streams')
      .select('*')
      .eq('user_id', user.id)
-     .single()
-    if (data) {
-      setYoutubeLink(data.youtube_link || '')
-      setStreamKey(data.stream_key || '')
+
+    if (data && data.length > 0) {
+      const loadedStreams = data.map((s, idx) => ({
+        id: idx + 1,
+        youtubeLink: s.youtube_link || '',
+        streamKey: s.stream_key || '',
+        dbId: s.id
+      }))
+      setStreams(loadedStreams)
     }
   }
 
-  const getMessages = async () => {
-    const { data } = await supabase
-     .from('support_messages')
-     .select('*')
-     .eq('user_id', user.id)
-     .order('created_at', { ascending: false })
-    setMessages(data || [])
+  const addChannel = () => {
+    setStreams([...streams, { id: streams.length + 1, youtubeLink: '', streamKey: '' }])
   }
 
-  const getPayments = async () => {
-    const { data } = await supabase
-     .from('payments')
-     .select('*, plans(*)')
-     .eq('user_id', user.id)
-     .order('created_at', { ascending: false })
-    setPayments(data || [])
+  const removeChannel = (id) => {
+    if (streams.length === 1) return alert('Kam se kam 1 channel rakhna padega')
+    setStreams(streams.filter(s => s.id!== id))
   }
 
-  const handlePlanClick = (plan) => {
-    setSelectedPlan(plan)
-    setUtr('')
+  const updateStream = (id, field, value) => {
+    setStreams(streams.map(s => s.id === id? {...s, [field]: value } : s))
   }
 
-  const handleUtrSubmit = async () => {
-    if (!utr ||!selectedPlan) return alert('UTR daal bhai')
+  const saveAllStreams = async () => {
     setLoading(true)
 
-    const { error } = await supabase.from('payments').insert({
-      user_id: user.id,
-      plan_id: selectedPlan.id,
-      utr: utr,
-      status: 'pending'
-    })
+    // Pehle purane delete karo
+    await supabase.from('user_streams').delete().eq('user_id', user.id)
 
-    if (error) alert('Error: ' + error.message)
-    else {
-      alert('UTR Submit ho gaya! Admin confirm karega 24 hours me')
-      setSelectedPlan(null)
-      setUtr('')
-      getPayments()
-    }
-    setLoading(false)
-  }
-
-  const saveStreamData = async () => {
-    if (!youtubeLink &&!streamKey) return alert('Kuch to daal bhai')
-    setLoading(true)
-
-    const { error } = await supabase
-     .from('user_streams')
-     .upsert({
+    // Naye insert karo
+    const streamsToInsert = streams
+     .filter(s => s.youtubeLink || s.streamKey)
+     .map(s => ({
         user_id: user.id,
-        youtube_link: youtubeLink,
-        stream_key: streamKey
-      })
+        youtube_link: s.youtubeLink,
+        stream_key: s.streamKey
+      }))
 
-    if (error) alert('Error: ' + error.message)
-    else alert('Stream Settings Save ho gayi!')
-    setLoading(false)
-  }
-
-  const sendMessage = async () => {
-    if (!chatMsg.trim()) return
-    setLoading(true)
-
-    const { error } = await supabase.from('support_messages').insert({
-      user_id: user.id,
-      message: chatMsg
-    })
-
-    if (error) alert('Error: ' + error.message)
-    else {
-      setChatMsg('')
-      getMessages()
+    if (streamsToInsert.length > 0) {
+      const { error } = await supabase.from('user_streams').insert(streamsToInsert)
+      if (error) alert('Error: ' + error.message)
+      else alert('Sab channels save ho gaye! Ab live kar sakta hai')
+    } else {
+      alert('Koi channel daal to sahi bhai')
     }
+
     setLoading(false)
   }
 
@@ -144,174 +90,58 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-black text-white p-4 md:p-8">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-4xl mx-auto">
 
         {/* HEADER */}
         <div className="flex justify-between items-center mb-8 border-b border-gray-800 pb-4">
           <div>
             <h1 className="text-3xl font-bold">StreamKing 👑</h1>
-            <p className="text-gray-400">Welcome, {user.email}</p>
+            <p className="text-gray-400">{user.email}</p>
           </div>
           <button onClick={handleLogout} className="bg-red-600 px-4 py-2 rounded-lg hover:bg-red-700">
             Logout
           </button>
         </div>
 
-        {/* PAYMENT STATUS */}
-        {payments.length > 0 && (
-          <div className="mb-6 bg-gray-900 p-4 rounded-lg">
-            <h3 className="font-bold mb-2">Payment Status</h3>
-            {payments[0].status === 'pending' && (
-              <p className="text-yellow-400">⏳ {payments[0].plans?.name} - UTR: {payments[0].utr} - Pending Approval</p>
-            )}
-            {payments[0].status === 'confirmed' && (
-              <p className="text-green-400">✅ {payments[0].plans?.name} - Active</p>
-            )}
-            {payments[0].status === 'rejected' && (
-              <p className="text-red-400">❌ {payments[0].plans?.name} - Rejected</p>
-            )}
+        <div className="bg-gray-900 p-6 rounded-lg">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold">🎥 Apne YouTube Channels</h2>
+            <button
+              onClick={addChannel}
+              className="bg-green-600 px-4 py-2 rounded-lg hover:bg-green-700"
+            >
+              + Add Channel
+            </button>
           </div>
-        )}
 
-        <div className="grid lg:grid-cols-2 gap-6">
+          {streams.map((stream, index) => (
+            <div key={stream.id} className="bg-gray-800 p-5 rounded-lg mb-4 border border-gray-700">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-lg font-bold text-purple-400">Channel #{index + 1}</h3>
+                {streams.length > 1 && (
+                  <button
+                    onClick={() => removeChannel(stream.id)}
+                    className="bg-red-600 px-3 py-1 rounded text-sm hover:bg-red-700"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
 
-          {/* LEFT - PLANS */}
-          <div className="bg-gray-900 p-6 rounded-lg">
-            <h2 className="text-2xl font-bold mb-4">💎 Subscription Plans</h2>
-
-            {plans.map(plan => (
-              <div
-                key={plan.id}
-                onClick={() => handlePlanClick(plan)}
-                className="bg-gray-800 p-4 rounded-lg mb-3 cursor-pointer hover:bg-gray-700 border-2 border-transparent hover:border-purple-600 transition"
-              >
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="text-lg font-bold">{plan.name}</h3>
-                    <p className="text-gray-400 text-sm capitalize">{plan.duration} Plan</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold">₹{plan.price}</p>
-                    <p className="text-xs text-gray-400">+ ₹{plan.gst} GST</p>
-                    <p className="text-sm text-green-400 font-bold">Total: ₹{plan.price + plan.gst}</p>
-                  </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm mb-2 text-gray-400">YouTube Video Link</label>
+                  <input
+                    type="text"
+                    value={stream.youtubeLink}
+                    onChange={(e) => updateStream(stream.id, 'youtubeLink', e.target.value)}
+                    placeholder="https://youtube.com/watch?v=..."
+                    className="w-full bg-gray-700 p-3 rounded text-white border border-gray-600 focus:border-purple-500 outline-none"
+                  />
                 </div>
-              </div>
-            ))}
 
-            {/* QR + UTR Section */}
-            {selectedPlan && (
-              <div className="mt-6 bg-gray-800 p-4 rounded-lg border-2 border-purple-600">
-                <h3 className="font-bold mb-2 text-center">{selectedPlan.name} - ₹{selectedPlan.price + selectedPlan.gst}</h3>
-                <img src={QR_IMAGE} alt="QR Code" className="mx-auto my-4 rounded w-48 h-48 bg-white p-2" />
-                <p className="text-sm text-gray-400 mb-2 text-center">Scan karo aur payment ke baad UTR daalo:</p>
-                <input
-                  type="text"
-                  value={utr}
-                  onChange={(e) => setUtr(e.target.value)}
-                  placeholder="UTR / Transaction ID"
-                  className="w-full bg-gray-700 p-3 rounded mb-3 text-white border border-gray-600"
-                />
-                <button
-                  onClick={handleUtrSubmit}
-                  disabled={loading}
-                  className="w-full bg-purple-600 py-3 rounded-lg hover:bg-purple-700 disabled:bg-gray-600 font-bold"
-                >
-                  {loading? 'Submitting...' : 'Submit UTR for Approval'}
-                </button>
-                <button
-                  onClick={() => setSelectedPlan(null)}
-                  className="w-full mt-2 bg-gray-700 py-2 rounded-lg hover:bg-gray-600"
-                >
-                  Cancel
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* RIGHT SIDE */}
-          <div className="space-y-6">
-
-            {/* STREAM SETTINGS */}
-            <div className="bg-gray-900 p-6 rounded-lg">
-              <h2 className="text-2xl font-bold mb-4">🎥 Stream Settings</h2>
-
-              <div className="mb-4">
-                <label className="block text-sm mb-2 text-gray-400">YouTube Video Link</label>
-                <input
-                  type="text"
-                  value={youtubeLink}
-                  onChange={(e) => setYoutubeLink(e.target.value)}
-                  placeholder="https://youtube.com/watch?v=..."
-                  className="w-full bg-gray-800 p-3 rounded text-white border border-gray-700"
-                />
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm mb-2 text-gray-400">Stream Key</label>
-                <input
-                  type="password"
-                  value={streamKey}
-                  onChange={(e) => setStreamKey(e.target.value)}
-                  placeholder="Your YouTube Live Stream Key"
-                  className="w-full bg-gray-800 p-3 rounded text-white border border-gray-700"
-                />
-              </div>
-
-              <button
-                onClick={saveStreamData}
-                disabled={loading}
-                className="w-full bg-blue-600 py-3 rounded-lg hover:bg-blue-700 disabled:bg-gray-600 font-bold"
-              >
-                {loading? 'Saving...' : 'Save Stream Settings'}
-              </button>
-            </div>
-
-            {/* SUPPORT CHAT */}
-            <div className="bg-gray-900 p-6 rounded-lg">
-              <h2 className="text-2xl font-bold mb-4">💬 Support Chat</h2>
-
-              <div className="bg-gray-800 p-3 rounded-lg mb-4 h-56 overflow-y-auto">
-                {messages.length === 0? (
-                  <p className="text-gray-500 text-sm text-center mt-20">Koi problem ho to message karo</p>
-                ) : messages.map(msg => (
-                  <div key={msg.id} className="mb-3">
-                    <div className="bg-gray-700 p-3 rounded-lg">
-                      <p className="text-xs text-gray-400 mb-1">You:</p>
-                      <p className="text-sm">{msg.message}</p>
-                    </div>
-                    {msg.reply && (
-                      <div className="bg-green-900/50 p-3 rounded-lg mt-2 ml-4 border-l-2 border-green-500">
-                        <p className="text-xs text-green-400 mb-1">Admin:</p>
-                        <p className="text-sm">{msg.reply}</p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={chatMsg}
-                  onChange={(e) => setChatMsg(e.target.value)}
-                  placeholder="Apni problem likho..."
-                  className="flex-1 bg-gray-800 p-3 rounded-lg text-white border border-gray-700"
-                  onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                />
-                <button
-                  onClick={sendMessage}
-                  disabled={loading}
-                  className="bg-green-600 px-6 py-3 rounded-lg hover:bg-green-700 disabled:bg-gray-600 font-bold"
-                >
-                  Send
-                </button>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
+                <div>
+                  <label className="block text-sm mb-2 text-gray-400">Stream Key</label>
+                  <input
+                    type="password"
+                    value={stream.streamKey}
