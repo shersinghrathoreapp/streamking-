@@ -17,7 +17,7 @@ export default function Dashboard() {
 
   const router = useRouter()
 
-  // QR Code - Apna QR image ka link yahan daal dena
+  //const QR_IMAGE = 'https://via.placeholder.com/200x200.png?text=Scan+To+Pay'
   const QR_IMAGE = 'https://via.placeholder.com/200x200.png?text=Scan+To+Pay'
 
   useEffect(() => {
