@@ -43,7 +43,7 @@ export default function Dashboard() {
   }
 
   const addChannel = () => {
-    setStreams([...streams, { id: streams.length + 1, youtubeLink: '', streamKey: '' }])
+    setStreams([...streams, { id: Date.now(), youtubeLink: '', streamKey: '' }])
   }
 
   const removeChannel = (id) => {
@@ -58,10 +58,8 @@ export default function Dashboard() {
   const saveAllStreams = async () => {
     setLoading(true)
 
-    // Pehle purane delete karo
     await supabase.from('user_streams').delete().eq('user_id', user.id)
 
-    // Naye insert karo
     const streamsToInsert = streams
      .filter(s => s.youtubeLink || s.streamKey)
      .map(s => ({
@@ -92,7 +90,6 @@ export default function Dashboard() {
     <div className="min-h-screen bg-black text-white p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
 
-        {/* HEADER */}
         <div className="flex justify-between items-center mb-8 border-b border-gray-800 pb-4">
           <div>
             <h1 className="text-3xl font-bold">StreamKing 👑</h1>
@@ -145,3 +142,31 @@ export default function Dashboard() {
                   <input
                     type="password"
                     value={stream.streamKey}
+                    onChange={(e) => updateStream(stream.id, 'streamKey', e.target.value)}
+                    placeholder="xxxx-xxxx-xxxx-xxxx"
+                    className="w-full bg-gray-700 p-3 rounded text-white border border-gray-600 focus:border-purple-500 outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+
+          <button
+            onClick={saveAllStreams}
+            disabled={loading}
+            className="w-full bg-blue-600 py-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-600 font-bold text-lg mt-4"
+          >
+            {loading? 'Saving...' : '💾 Sab Save Karo'}
+          </button>
+
+          <div className="mt-6 bg-gray-800 p-4 rounded-lg border border-yellow-600/30">
+            <p className="text-sm text-yellow-400">
+              <b>Note:</b> Save karne ke baad OBS ya kisi bhi streaming software me ye Key daal ke live kar sakta hai.
+              Jitne chahe utne channels add kar sakta hai.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
