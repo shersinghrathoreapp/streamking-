@@ -1,7 +1,13 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
+
+// SUPABASE CONFIG - YAHAN APNI KEYS DAAL DE
+const supabaseUrl = 'https://TUMHARA-PROJECT-URL.supabase.co'
+const supabaseAnonKey = 'TUMHARA-ANON-KEY-YAHAN'
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 export default function Dashboard() {
   const [user, setUser] = useState(null)
@@ -27,16 +33,15 @@ export default function Dashboard() {
 
   const getStreams = async () => {
     const { data } = await supabase
-     .from('user_streams')
-     .select('*')
-     .eq('user_id', user.id)
+    .from('user_streams')
+    .select('*')
+    .eq('user_id', user.id)
 
     if (data && data.length > 0) {
       const loadedStreams = data.map((s, idx) => ({
         id: idx + 1,
         youtubeLink: s.youtube_link || '',
-        streamKey: s.stream_key || '',
-        dbId: s.id
+        streamKey: s.stream_key || ''
       }))
       setStreams(loadedStreams)
     }
@@ -57,12 +62,11 @@ export default function Dashboard() {
 
   const saveAllStreams = async () => {
     setLoading(true)
-
     await supabase.from('user_streams').delete().eq('user_id', user.id)
 
     const streamsToInsert = streams
-     .filter(s => s.youtubeLink || s.streamKey)
-     .map(s => ({
+    .filter(s => s.youtubeLink || s.streamKey)
+    .map(s => ({
         user_id: user.id,
         youtube_link: s.youtubeLink,
         stream_key: s.streamKey
@@ -71,11 +75,8 @@ export default function Dashboard() {
     if (streamsToInsert.length > 0) {
       const { error } = await supabase.from('user_streams').insert(streamsToInsert)
       if (error) alert('Error: ' + error.message)
-      else alert('Sab channels save ho gaye! Ab live kar sakta hai')
-    } else {
-      alert('Koi channel daal to sahi bhai')
+      else alert('Save ho gaya! Ab live kar sakta hai')
     }
-
     setLoading(false)
   }
 
@@ -89,26 +90,18 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-black text-white p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
-
         <div className="flex justify-between items-center mb-8 border-b border-gray-800 pb-4">
           <div>
             <h1 className="text-3xl font-bold">StreamKing 👑</h1>
             <p className="text-gray-400">{user.email}</p>
           </div>
-          <button onClick={handleLogout} className="bg-red-600 px-4 py-2 rounded-lg hover:bg-red-700">
-            Logout
-          </button>
+          <button onClick={handleLogout} className="bg-red-600 px-4 py-2 rounded-lg hover:bg-red-700">Logout</button>
         </div>
 
         <div className="bg-gray-900 p-6 rounded-lg">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold">🎥 Apne YouTube Channels</h2>
-            <button
-              onClick={addChannel}
-              className="bg-green-600 px-4 py-2 rounded-lg hover:bg-green-700"
-            >
-              + Add Channel
-            </button>
+            <button onClick={addChannel} className="bg-green-600 px-4 py-2 rounded-lg hover:bg-green-700">+ Add Channel</button>
           </div>
 
           {streams.map((stream, index) => (
@@ -116,12 +109,7 @@ export default function Dashboard() {
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-lg font-bold text-purple-400">Channel #{index + 1}</h3>
                 {streams.length > 1 && (
-                  <button
-                    onClick={() => removeChannel(stream.id)}
-                    className="bg-red-600 px-3 py-1 rounded text-sm hover:bg-red-700"
-                  >
-                    Delete
-                  </button>
+                  <button onClick={() => removeChannel(stream.id)} className="bg-red-600 px-3 py-1 rounded text-sm hover:bg-red-700">Delete</button>
                 )}
               </div>
 
@@ -136,7 +124,6 @@ export default function Dashboard() {
                     className="w-full bg-gray-700 p-3 rounded text-white border border-gray-600 focus:border-purple-500 outline-none"
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm mb-2 text-gray-400">Stream Key</label>
                   <input
@@ -158,13 +145,6 @@ export default function Dashboard() {
           >
             {loading? 'Saving...' : '💾 Sab Save Karo'}
           </button>
-
-          <div className="mt-6 bg-gray-800 p-4 rounded-lg border border-yellow-600/30">
-            <p className="text-sm text-yellow-400">
-              <b>Note:</b> Save karne ke baad OBS ya kisi bhi streaming software me ye Key daal ke live kar sakta hai.
-              Jitne chahe utne channels add kar sakta hai.
-            </p>
-          </div>
         </div>
       </div>
     </div>
